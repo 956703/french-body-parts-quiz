@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>French External Body Parts Showdown</title>
+    <style>
+        :root {
+            --bg-color: #1e1e2e;
+            --card-color: #252538;
+            --text-color: #cdd6f4;
+            --accent-color: #89b4fa;
+            --correct-color: #a6e3a1;
+            --wrong-color: #f38ba8;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .game-container {
+            width: 100%;
+            max-width: 900px;
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .game-container { grid-template-columns: 1fr; }
+        }
+
+        .card {
+            background-color: var(--card-color);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+
+        .header-status {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #313244;
+            padding-bottom: 12px;
+            margin-bottom: 20px;
+        }
+
+        .timer-box {
+            font-size: 24px;
+            font-weight: bold;
+            color: #f9e2af;
+            background: #313244;
+            padding: 8px 16px;
+            border-radius: 8px;
+        }
+
+        .question-text {
+            font-size: 22px;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+
+        .option-btn {
+            background-color: #313244;
+            border: 2px solid transparent;
+            color: var(--text-color);
+            border-radius: 8px;
+            padding: 16px;
+            font-size: 18px;
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .option-btn:hover:not([disabled]) {
+            background-color: #45475a;
+            border-color: var(--accent-color);
+        }
+
+        .option-btn.correct {
+            background-color: var(--correct-color) !important;
+            color: #11111b;
+            font-weight: bold;
+        }
+
+        .option-btn.wrong {
+            background-color: var(--wrong-color) !important;
+            color: #11111b;
+            font-weight: bold;
+        }
+
+        .option-btn:disabled {
+            cursor: default;
+            opacity: 1;
+        }
+
+        .scoreboard h2 {
+            margin-top: 0;
+            color: var(--accent-color);
+            border-bottom: 2px solid #313244;
+            padding-bottom: 8px;
+        }
+
+        .score-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #313244;
+            font-size: 16px;
+        }
+
+        .score-row.player {
+            font-weight: bold;
+            color: #f9e2af;
+        }
+
+        .hidden { display: none !important; }
+
+        .feedback {
+            margin-top: 15px;
+            font-size: 16px;
+            padding: 12px;
+            border-radius: 6px;
+            background: #313244;
+            line-height: 1.4;
+        }
+
+        .next-btn {
+            margin-top: 15px;
+            background-color: var(--accent-color);
+            color: #11111b;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            float: right;
+        }
+
+        .next-btn:hover {
+            opacity: 0.9;
+        }
+
+        .clearfix::after {
+            content: "";
+            clear: both;
+            display: table;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="card" id="quiz-card">
+            <div class="header-status" id="quiz-header">
+                <span id="question-counter">Question 1/15</span>
+                <div class="timer-box" id="timer">0.0s</div>
+            </div>
+
+            <div id="game-playground" class="clearfix">
+                <div class="question-text" id="question-field">Loading question...</div>
+                <div class="options-grid" id="options-box"></div>
+                <div id="feedback-box" class="feedback hidden"></div>
+                <button id="next-btn" class="next-btn hidden" onclick="nextQuestion()">Next Question ➔</button>
+            </div>
+
+            <div id="review-playground" class="hidden clearfix">
+                <h2>Game Over! Reviewing Missed Questions</h2>
+                <div class="question-text" id="review-question-field">Review text</div>
+                <div class="options-grid" id="review-options-box"></div>
+                <div id="review-feedback-box" class="feedback"></div>
+                <button id="review-next-btn" class="next-btn" onclick="nextReviewQuestion()">Next Review ➔</button>
+            </div>
+
+            <div id="final-screen" class="hidden clearfix">
+                <h2>🏆 Match Finished!</h2>
+                <p id="final-status-text">Great job completing the external body parts challenge.</p>
+                <button class="next-btn" onclick="location.reload()">Play Again ↺</button>
+            </div>
+        </div>
+
+        <div class="card scoreboard">
+            <h2>Live Scoreboard</h2>
+            <div id="scores-list"></div>
+        </div>
+    </div>
+
+    <script>
+        const baseQuestions = [
+            { q: "What is the French word for 'the head'?", c: "la tête (lah teht)", i: ["le cou (luh koo)", "le bras (luh brah)", "la main (lah mahn)"], hint: "Starts with 't' and is at the top." },
+            { q: "Which French word means 'the hair'?", c: "les cheveux (lay shuh-vuh)", i: ["le nez (luh nay)", "l'œil (luhy)", "la bouche (lah boosh)"], hint: "Plural noun covering your skull." },
+            { q: "What is the French term for 'the forehead'?", c: "le front (luh frohn)", i: ["le menton (luh mahn-tohn)", "la joue (lah zhoo)", "le nez (luh nay)"], hint: "Sounds very similar to its English counterpart." },
+            { q: "Which of these French words means 'the eye'?", c: "l'œil (luhy)", i: ["l'oreille (loh-ray)", "le front (luh frohn)", "la joue (lah zhoo)"], hint: "Short singular word starting with an 'o'." },
+            { q: "What is the French word for 'the ear'?", c: "l'oreille (loh-ray)", i: ["l'œil (luhy)", "le nez (luh nay)", "la bouche (lah boosh)"], hint: "Sounds like 'auricle' or 'oral'." },
+            { q: "Which French word corresponds to 'the nose'?", c: "le nez (luh nay)", i: ["la langue (lah lahng)", "la dent (lah dahnt)", "la lèvre (lah lehvr)"], hint: "Three letters, right in the center of the face." },
+            { q: "What is the French word for 'the mouth'?", c: "la bouche (lah boosh)", i: ["le menton (luh mahn-tohn)", "la joue (lah zhoo)", "le nez (luh nay)"], hint: "Feminine noun starting with 'b'." },
+            { q: "Which term means 'the neck' in French?", c: "le cou (luh koo)", i: ["le visage (luh vee-zahzh)", "le front (luh frohn)", "l'épaule (lay-pohl)"], hint: "Two-letter word linking head to body." },
+            { q: "What is the French word for 'the shoulder'?", c: "l'épaule (lay-pohl)", i: ["le dos (luh doh)", "le cou (luh koo)", "la poitrine (lah pwah-treen)"], hint: "Starts with an 'é' and connects your arm." },
+            { q: "Which French word means 'the arm'?", c: "le bras (luh brah)", i: ["la jambe (lah zhahnb)", "le coude (luh kood)", "le poignet (luh pwah-nyay)"], hint: "Starts with 'b' and sounds like 'brace'." },
+            { q: "What is the French term for 'the elbow'?", c: "le coude (luh kood)", i: ["le bras (luh brah)", "la main (lah mahn)", "l'épaule (lay-pohl)"], hint: "The joint halfway down your arm." },
+            { q: "Which word translates to 'the hand' in French?", c: "la main (lah mahn)", i: ["le bras (luh brah)", "le doigt (luh dwah)", "l'épaule (lay-pohl)"], hint: "Think of words like 'manual'." },
+            { q: "What is the French word for 'the finger'?", c: "le doigt (luh dwah)", i: ["l'ongle (lohng-luh)", "la main (lah mahn)", "le bras (luh brah)"], hint: "Starts with a 'd'." },
+            { q: "Which French word means 'the leg'?", c: "la jambe (lah zhahnb)", i: ["le genou (luh zhnoo)", "le pied (luh pyay)", "la cheville (lah shuh-veey)"], hint: "Sounds a bit like the English word 'jamb'." },
+            { q: "What is the French word for 'the foot'?", c: "le pied (luh pyay)", i: ["la main (lah mahn)", "le doigt (luh dwah)", "le genou (luh zhnoo)"], hint: "Think of a pedestrian or a pedestal." }
+        ];
+
+        let currentQuestionIndex = 0;
+        let playerScore = 0;
+        let stopwatchInterval = null;
+        let timeElapsed = 0.0;
+        let missedQuestions = [];
+        let currentReviewIndex = 0;
+        let questionLocked = false;
+
+        const competitors = [
+            { name: "Chloe 🇫🇷", score: 0, speedFactor: 1.2 },
+            { name: "Lucas 🇨🇦", score: 0, speedFactor: 2.5 },
+            { name: "Emma 🇬🇧", score: 0, speedFactor: 1.8 }
+        ];
+
+        function shuffleArray(array) {
+            const copy = [...array];
+            for (let i = copy.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [copy[i], copy[j]] = [copy[j], copy[i]];
+            }
+            return copy;
+        }
+
+        function updateScoreboard() {
+            const scoresList = document.getElementById("scores-list");
+            const allScores = [
+                { name: "You (Player)", score: playerScore, isPlayer: true },
+                ...competitors
+            ].sort((a, b) => b.score - a.score);
+
+            scoresList.innerHTML = allScores.map((entry) => {
+                const rowClass = entry.isPlayer ? "score-row player" : "score-row";
+                return `
+                    <div class="${rowClass}">
+                        <span>${entry.name}</span>
+                        <span>${entry.score}</span>
+                    </div>
+                `;
+            }).join("");
+        }
+
+        function startStopwatch() {
+            stopStopwatch();
+            timeElapsed = 0.0;
+            const timerEl = document.getElementById("timer");
+            timerEl.textContent = "0.0s";
+
+            stopwatchInterval = setInterval(() => {
+                timeElapsed += 0.1;
+                timerEl.textContent = `${timeElapsed.toFixed(1)}s`;
+            }, 100);
+        }
+
+        function stopStopwatch() {
+            if (stopwatchInterval) {
+                clearInterval(stopwatchInterval);
+                stopwatchInterval = null;
+            }
+        }
+
+        function advanceCompetitors() {
+            competitors.forEach((competitor) => {
+                const gain = Math.random() < (0.65 + competitor.speedFactor / 5) ? 1 : 0;
+                competitor.score += gain;
+            });
+            updateScoreboard();
+        }
+
+        function renderQuestion() {
+            const current = baseQuestions[currentQuestionIndex];
+            const questionCounter = document.getElementById("question-counter");
+            const questionField = document.getElementById("question-field");
+            const optionsBox = document.getElementById("options-box");
+            const feedbackBox = document.getElementById("feedback-box");
+            const nextBtn = document.getElementById("next-btn");
+
+            questionLocked = false;
+            questionCounter.textContent = `Question ${currentQuestionIndex + 1}/${baseQuestions.length}`;
+            questionField.textContent = current.q;
+            optionsBox.innerHTML = "";
+            feedbackBox.classList.add("hidden");
+            feedbackBox.textContent = "";
+            nextBtn.classList.add("hidden");
+
+            const options = shuffleArray([current.c, ...current.i]);
+            options.forEach((option) => {
+                const button = document.createElement("button");
+                button.type = "button";
+                button.className = "option-btn";
+                button.textContent = option;
+                button.addEventListener("click", () => handleAnswer(button, option, current));
+                optionsBox.appendChild(button);
+            });
+
+            startStopwatch();
+        }
+
+        function handleAnswer(button, chosenOption, question) {
+            if (questionLocked) return;
+            questionLocked = true;
+            stopStopwatch();
+
+            const optionButtons = document.querySelectorAll("#options-box .option-btn");
+            optionButtons.forEach((btn) => {
+                btn.disabled = true;
+                if (btn.textContent === question.c) {
+                    btn.classList.add("correct");
+                }
+                if (btn.textContent === chosenOption && chosenOption !== question.c) {
+                    btn.classList.add("wrong");
+                }
+            });
+
+            const feedbackBox = document.getElementById("feedback-box");
+            feedbackBox.classList.remove("hidden");
+
+            if (chosenOption === question.c) {
+                playerScore += 1;
+                feedbackBox.textContent = `Correct! ${question.c} is right. Hint: ${question.hint}`;
+                advanceCompetitors();
+            } else {
+                missedQuestions.push({
+                    ...question,
+                    selected: chosenOption,
+                    reactionTime: timeElapsed.toFixed(1)
+                });
+                feedbackBox.textContent = `Not quite — the correct answer is ${question.c}. Hint: ${question.hint}`;
+            }
+
+            updateScoreboard();
+            document.getElementById("next-btn").classList.remove("hidden");
+        }
+
+        function nextQuestion() {
+            currentQuestionIndex += 1;
+            if (currentQuestionIndex < baseQuestions.length) {
+                renderQuestion();
+            } else {
+                finishGame();
+            }
+        }
+
+        function renderReviewQuestion() {
+            const reviewQuestion = missedQuestions[currentReviewIndex];
+            const reviewField = document.getElementById("review-question-field");
+            const reviewOptionsBox = document.getElementById("review-options-box");
+            const reviewFeedbackBox = document.getElementById("review-feedback-box");
+
+            reviewField.textContent = reviewQuestion.q;
+            reviewOptionsBox.innerHTML = "";
+
+            const options = shuffleArray([reviewQuestion.c, ...reviewQuestion.i]);
+            options.forEach((option) => {
+                const button = document.createElement("button");
+                button.type = "button";
+                button.className = "option-btn";
+                button.textContent = option;
+                button.disabled = true;
+
+                if (option === reviewQuestion.c) {
+                    button.classList.add("correct");
+                }
+                if (option === reviewQuestion.selected && option !== reviewQuestion.c) {
+                    button.classList.add("wrong");
+                }
+
+                reviewOptionsBox.appendChild(button);
+            });
+
+            reviewFeedbackBox.textContent = `Correct answer: ${reviewQuestion.c}. You chose "${reviewQuestion.selected}". You took ${reviewQuestion.reactionTime}s.`;
+        }
+
+        function nextReviewQuestion() {
+            currentReviewIndex += 1;
+            if (currentReviewIndex < missedQuestions.length) {
+                renderReviewQuestion();
+            } else {
+                document.getElementById("review-playground").classList.add("hidden");
+                const message = `You scored ${playerScore}/${baseQuestions.length}. Great work!`;
+                showFinalScreen(message);
+            }
+        }
+
+        function showFinalScreen(message) {
+            const finalStatusText = document.getElementById("final-status-text");
+            finalStatusText.textContent = message;
+            document.getElementById("final-screen").classList.remove("hidden");
+        }
+
+        function finishGame() {
+            stopStopwatch();
+            document.getElementById("game-playground").classList.add("hidden");
+
+            if (missedQuestions.length > 0) {
+                currentReviewIndex = 0;
+                document.getElementById("review-playground").classList.remove("hidden");
+                renderReviewQuestion();
+            } else {
+                const perfectMessage = `Perfect! You answered all ${baseQuestions.length} questions correctly.`;
+                showFinalScreen(perfectMessage);
+            }
+        }
+
+        updateScoreboard();
+        renderQuestion();
+    </script>
+</body>
+</html>
